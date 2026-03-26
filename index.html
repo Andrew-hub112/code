@@ -1,3 +1,8 @@
+<div style="text-align:right; margin-bottom:10px;">
+  <button onclick="setLang('es')">ES</button>
+  <button onclick="setLang('en')">EN</button>
+</div>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -235,11 +240,90 @@
   </div>
 
   <script>
+
+// 🌐 LANGUAGE SYSTEM
+const LANG = {
+  es: {
+    title: "Acceso al Beamer de Cinemática",
+    step2: "Justificación de cada pregunta",
+    errorWords: "Cada respuesta debe tener al menos 20 palabras.",
+    errorQuality: "Las respuestas no muestran comprensión suficiente.",
+    ok: "Respuestas válidas. Código generado."
+  },
+  en: {
+    title: "Kinematics Beamer Access",
+    step2: "Justification for each question",
+    errorWords: "Each answer must contain at least 20 words.",
+    errorQuality: "Answers do not show sufficient understanding.",
+    ok: "Answers valid. Code generated."
+  }
+};
+
+let currentLang = 'es';
+
+function setLang(lang) {
+  currentLang = lang;
+
+  document.querySelector("h1").innerText = LANG[lang].title;
+  document.querySelector("#step2 h2").innerText = LANG[lang].step2;
+}
+
+
     const INITIAL_CODE = '3411';
     const EMAIL_TO = 'mauri.diaz@uandresbello.edu';
     let currentGeneratedCode = '';
 
+
+
+
     const ids = ['q1','q2','q3','q4'];
+
+
+function evaluateAnswer(text) {
+
+  const t = text.toLowerCase();
+  let score = 0;
+
+  // 1️⃣ LENGTH (basic effort)
+  const words = t.split(/\s+/).length;
+  if (words >= 20) score += 1;
+
+  // 2️⃣ MATH SIGNALS
+  if (/[=]/.test(t)) score += 1;
+  if (/[0-9]/.test(t)) score += 1;
+
+  // 3️⃣ DERIVATIVE / INTEGRAL FLEXIBLE DETECTION
+  if (t.includes("deriv") || t.includes("d/dt")) score += 1;
+  if (t.includes("integr") || t.includes("∫")) score += 1;
+
+  // 4️⃣ PHYSICS CONCEPTS (flexible)
+  if (t.includes("velocity") || t.includes("speed")) score += 1;
+  if (t.includes("time") || t.includes("t=")) score += 1;
+  if (t.includes("theta") || t.includes("angle")) score += 1;
+  if (t.includes("radial") || t.includes("polar")) score += 1;
+
+  // 5️⃣ EXPLANATION STRUCTURE
+  if (t.includes("first") || t.includes("then") || t.includes("after")) score += 1;
+
+  // Normalize score (0–5 per question)
+  return Math.min(score, 5);
+}
+
+function computeScore(answers) {
+  let total = 0;
+
+  answers.forEach(ans => {
+    const s = evaluateAnswer(ans);
+
+    if (s >= 3) total += 1; // acceptable answer
+  });
+
+  return total; // max 4
+}
+
+
+
+
 
     function wordCount(text) {
       return text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -290,10 +374,36 @@ document.getElementById('sendEmailBtn').addEventListener('click', () => {
     return;
   }
 
-  const answers = ids.map(id => document.getElementById(id).value.trim());
-  const counts = answers.map(wordCount);
+const answers = ids.map(id => document.getElementById(id).value.trim());
+const counts = answers.map(wordCount);
 
-  const invalidIndex = counts.findIndex(c => c < 20);
+// ❌ WORD CHECK
+const invalidIndex = counts.findIndex(c => c < 20);
+if (invalidIndex !== -1) {
+  setStatus(status, LANG[currentLang].errorWords, 'danger');
+  return;
+}
+
+// 🔍 QUALITY CHECK
+const scores = answers.map(evaluateAnswer);
+const weak = scores.findIndex(s => s < 2);
+
+if (weak !== -1) {
+  setStatus(status, LANG[currentLang].errorQuality, 'danger');
+  return;
+}
+
+// 🧠 FINAL SCORE
+const finalScore = computeScore(answers);
+
+// ❌ if score too low → no code
+if (finalScore < 3) {
+  setStatus(status, `Puntaje insuficiente: ${finalScore}/4. Debe mejorar sus respuestas.`, 'danger');
+  return;
+}
+
+setStatus(status, `${LANG[currentLang].ok} Puntaje: ${finalScore}/4`, 'ok');
+
 
   if (invalidIndex !== -1) {
     setStatus(status, `La pregunta ${invalidIndex + 1} no cumple 20 palabras.`, 'danger');
@@ -303,13 +413,11 @@ document.getElementById('sendEmailBtn').addEventListener('click', () => {
   // ✅ Generate new code ONLY HERE
   currentGeneratedCode = randomFourDigits();
 
-  document.getElementById('generatedCode').textContent = currentGeneratedCode;
+  setStatus(status, `${LANG[currentLang].ok} Puntaje: ${finalScore}/4`, 'ok');
 
-  // ✅ SHOW STEP 3 ONLY AFTER VALIDATION
-  document.getElementById('step3').classList.remove('hidden');
-
-  // ✅ ENABLE STEP 4 ONLY NOW
-  document.getElementById('step4').classList.remove('hidden');
+document.getElementById('generatedCode').textContent = currentGeneratedCode;
+document.getElementById('step3').classList.remove('hidden');
+document.getElementById('step4').classList.remove('hidden');
 
   // Scroll to Step 3 (nice UX)
   document.getElementById('step3').scrollIntoView({ behavior: 'smooth' });
@@ -320,6 +428,7 @@ Nombre: ${name}
 Correo: ${email}
 Código inicial: ${INITIAL_CODE}
 Nuevo código: ${currentGeneratedCode}
+Puntaje automático: ${finalScore}/4
 
 Pregunta 1:
 ${answers[0]}
